@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#05080b">
+<title>Redline Link</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Thai:wght@400;500&family=Rajdhani:wght@500;600;700&display=swap">
+<style>
+/* Layout: one phone-sized dash. Status bar on top, one view at a time (GAUGE / AF / DATA), tab bar fixed at the bottom.
+   One dark look on purpose, like the gauge itself; the accent follows the gauge theme (ICE / LIME / AMBER). */
+:root {
+  --bg: #05080b;
+  --panel: #0d1319;
+  --panel2: #111a21;
+  --edge: #1f2b34;
+  --text: #d9e2e7;
+  --muted: #7d8d98;
+  --accent: #0a9dff;
+  --accent2: #4fd2ff;
+  --good: #2eff6e;
+  --warn: #ffea00;
+  --crit: #ff2e2e;
+  --lean: #5ab4ff;
+  --f-display: "Rajdhani", "Noto Sans Thai", system-ui, sans-serif;
+  --f-body: "Noto Sans Thai", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
+:root[data-accent="lime"]  { --accent: #b6ff00; --accent2: #d4ff2a; --good: #b6ff00; --warn: #fff200; }
+:root[data-accent="amber"] { --accent: #ff8a00; --accent2: #ffb42a; --good: #7cff2e; --warn: #ffe000; }
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--f-body);
+  font-size: 14px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.app { max-width: 760px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; padding-bottom: 76px; }
+button { font: inherit; color: inherit; }
+.num { font-family: var(--f-display); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+.lbl { font-family: var(--f-display); font-weight: 600; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+
+/* status bar */
+.bar { display: flex; align-items: center; gap: 10px; padding: 12px 0 10px; border-bottom: 1px solid var(--edge); position: relative; }
+.bar::after { content: ""; position: absolute; left: 0; bottom: -1px; height: 1px; width: 100%; background: linear-gradient(90deg, var(--accent), transparent 80%); }
+.brand { font-family: var(--f-display); font-weight: 700; font-size: 22px; letter-spacing: .14em; color: var(--accent2); }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--edge); background: var(--panel); font-family: var(--f-display); font-weight: 600; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); min-height: 28px; }
+.pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: block; }
+.pill.live { color: var(--text); } .pill.live i { background: var(--good); }
+.pill.demo i { background: var(--warn); } .pill.demo { color: var(--warn); }
+.pill.err i { background: var(--crit); } .pill.err { color: var(--crit); }
+.spacer { flex: 1; }
+.btn { min-height: 38px; padding: 0 16px; background: var(--panel2); border: 1px solid var(--accent); color: var(--text); font-family: var(--f-display); font-weight: 700; font-size: 15px; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
+.btn:hover { background: color-mix(in srgb, var(--accent) 22%, var(--panel2)); }
+.btn.ghost { border-color: var(--edge); color: var(--muted); }
+.btn.danger { border-color: var(--crit); }
+.btn[aria-pressed="true"], .btn.on { background: color-mix(in srgb, var(--accent) 30%, var(--panel2)); color: var(--text); border-color: var(--accent); }
+.btn:focus-visible, .tab:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+.notice { margin: 12px 0 0; padding: 10px 12px; background: var(--panel); border-left: 3px solid var(--warn); color: var(--text); font-size: 13px; line-height: 1.5; }
+.notice[hidden] { display: none !important; }
+
+main { flex: 1; padding-top: 14px; }
+.view { display: none; } .view.on { display: block; }
+
+/* shift bar */
+.shift { display: grid; grid-template-columns: repeat(13, 1fr); gap: 4px; height: 22px; }
+.shift b { background: #101921; border: 1px solid #1a2630; transition: background .06s; }
+.shift b.on { background: var(--accent); border-color: var(--accent); }
+.shift b.hi.on { background: var(--warn); border-color: var(--warn); }
+.shift b.red.on { background: var(--crit); border-color: var(--crit); }
+.shift.flash b { animation: flash .16s steps(2) infinite; }
+@keyframes flash { 0% { background: var(--crit); border-color: var(--crit); } 100% { background: #2a0a0a; border-color: #4a1414; } }
+
+/* speed */
+.hero { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 12px; padding: 14px 0 6px; }
+.speed { font-size: clamp(96px, 30vw, 168px); line-height: .82; color: var(--text); }
+.unit { font-family: var(--f-display); font-weight: 600; font-size: 20px; letter-spacing: .14em; color: var(--accent2); margin-top: 8px; display: flex; gap: 10px; align-items: center; }
+.tag { font-size: 11px; padding: 2px 7px; border: 1px solid var(--edge); color: var(--muted); letter-spacing: .12em; }
+.tag.gps { color: var(--good); border-color: color-mix(in srgb, var(--good) 50%, var(--edge)); }
+.gearbox { text-align: right; }
+.gear { font-size: clamp(64px, 20vw, 110px); line-height: .85; color: var(--accent2); }
+.rpmrow { display: flex; align-items: baseline; justify-content: space-between; margin: 10px 0 14px; }
+.rpm { font-size: 40px; line-height: 1; }
+
+/* tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.tile { background: var(--panel); border: 1px solid var(--edge); padding: 10px 12px 12px; min-width: 0; }
+.tile .v { font-size: 34px; line-height: 1.05; margin-top: 4px; white-space: nowrap; }
+.tile .v small { font-size: 15px; color: var(--muted); font-weight: 600; margin-left: 4px; letter-spacing: .06em; }
+.tile[hidden] { display: none !important; }
+.v.rich { color: var(--warn); } .v.lean { color: var(--lean); } .v.ok { color: var(--good); } .v.hot { color: var(--crit); }
+
+/* AF page */
+.afhead { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; padding: 6px 0 12px; }
+.afnum { font-size: clamp(76px, 24vw, 120px); line-height: .85; }
+.afstate { font-family: var(--f-display); font-weight: 700; font-size: 22px; letter-spacing: .14em; text-transform: uppercase; }
+.afscale { position: relative; height: 14px; margin-top: 10px; background: linear-gradient(90deg, var(--warn) 0 var(--zr, 40%), var(--good) var(--zr, 40%) var(--zl, 70%), var(--lean) var(--zl, 70%) 100%); opacity: .8; }
+.afscale i { position: absolute; top: -5px; width: 3px; height: 24px; background: #fff; left: 0; transition: left .12s linear; box-shadow: 0 0 0 1px #000; }
+.afticks { display: flex; justify-content: space-between; font-family: var(--f-mono); font-size: 10px; color: var(--muted); margin-top: 8px; }
+.minis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0; }
+.mini { background: var(--panel); border: 1px solid var(--edge); padding: 8px 10px; min-width: 0; }
+.mini .v { font-size: 22px; line-height: 1.1; }
+.maphead { display: flex; align-items: center; gap: 10px; margin: 14px 0 8px; }
+.afmap { display: grid; grid-template-columns: 34px repeat(11, minmax(0, 1fr)); gap: 1px; font-family: var(--f-mono); font-size: 10px; background: var(--edge); border: 1px solid var(--edge); }
+.afmap div { background: var(--panel); height: 19px; display: flex; align-items: center; justify-content: center; color: var(--muted); min-width: 0; overflow: hidden; }
+.afmap .h { background: var(--panel2); font-weight: 500; color: var(--muted); }
+.afmap .c.g { color: var(--good); background: color-mix(in srgb, var(--good) 13%, var(--panel)); }
+.afmap .c.r { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, var(--panel)); }
+.afmap .c.l { color: var(--lean); background: color-mix(in srgb, var(--lean) 16%, var(--panel)); }
+.afmap .cur { outline: 2px solid var(--accent2); outline-offset: -2px; position: relative; z-index: 1; }
+.afmap .h.cur { color: var(--accent2); background: color-mix(in srgb, var(--accent) 25%, var(--panel2)); }
+.hint { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 8px 0 0; }
+
+/* DATA page */
+.sect { margin: 0 0 18px; }
+.sect h2 { margin: 0 0 8px; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.rows { border-top: 1px solid var(--edge); }
+.rows div { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--edge); }
+.rows span:nth-child(2) { font-family: var(--f-mono); font-size: 15px; text-align: right; }
+.rows span:nth-child(3) { font-family: var(--f-mono); font-size: 11px; color: var(--muted); min-width: 48px; text-align: right; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-family: var(--f-mono); font-size: 12px; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; overflow-wrap: anywhere; }
+.log { font-family: var(--f-mono); font-size: 11px; color: var(--muted); background: var(--panel); border: 1px solid var(--edge); padding: 8px; overflow-wrap: anywhere; min-height: 44px; }
+
+/* tab bar */
+nav { position: fixed; left: 0; right: 0; bottom: 0; background: var(--panel); border-top: 1px solid var(--edge);
+  padding: 0 max(16px, env(safe-area-inset-left, 0px)) env(safe-area-inset-bottom, 0px) max(16px, env(safe-area-inset-right, 0px)); z-index: 5; }
+nav div { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); }
+.tab { height: 58px; background: none; border: 0; border-top: 2px solid transparent; font-family: var(--f-display); font-weight: 700; font-size: 18px; letter-spacing: .16em; color: var(--muted); cursor: pointer; }
+.tab[aria-selected="true"] { color: var(--accent2); border-top-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
+
+@media (min-width: 720px) { .tiles { grid-template-columns: repeat(3, 1fr); } .afmap div { height: 22px; font-size: 11px; } }
+@media (max-width: 380px) { .minis { grid-template-columns: repeat(2, 1fr); } .brand { font-size: 18px; } }
+@media (prefers-reduced-motion: reduce) { .shift.flash b { animation: none; background: var(--crit); } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="bar">
+    <span class="brand">REDLINE</span>
+    <span class="pill" id="pill"><i></i><span id="pillText">OFFLINE</span></span>
+    <span class="spacer"></span>
+    <button class="btn" id="connectBtn" type="button">CONNECT</button>
+  </header>
+  <p class="notice" id="notice" hidden></p>
+
+  <main>
+    <!-- GAUGE -->
+    <section class="view on" id="v-gauge" aria-label="Gauge">
+      <div class="shift" id="shift" aria-hidden="true"></div>
+      <div class="hero">
+        <div>
+          <div class="num speed" id="speed">--</div>
+          <div class="unit"><span id="speedUnit">KM/H</span><span class="tag" id="speedTag">ECU</span></div>
+        </div>
+        <div class="gearbox">
+          <div class="lbl">GEAR</div>
+          <div class="num gear" id="gear">-</div>
+        </div>
+      </div>
+      <div class="rpmrow"><span class="lbl">RPM</span><span class="num rpm" id="rpm">--</span></div>
+      <div class="tiles" id="tiles"></div>
+    </section>
+
+    <!-- AF -->
+    <section class="view" id="v-af" aria-label="Air fuel ratio">
+      <div class="afhead">
+        <div class="num afnum" id="afNum">--</div>
+        <div>
+          <div class="lbl">AIR-FUEL RATIO</div>
+          <div class="afstate" id="afState">NO SIGNAL</div>
+          <div class="afscale" id="afScale"><i id="afMark"></i></div>
+          <div class="afticks"><span>10</span><span>12</span><span>14</span><span>16</span><span>18</span></div>
+        </div>
+      </div>
+      <div class="minis">
+        <div class="mini"><div class="lbl">STFT %</div><div class="num v" id="m-stft">--</div></div>
+        <div class="mini"><div class="lbl">LTFT %</div><div class="num v" id="m-ltft">--</div></div>
+        <div class="mini"><div class="lbl">O2 mV</div><div class="num v" id="m-o2">--</div></div>
+        <div class="mini"><div class="lbl">TPS %</div><div class="num v" id="m-tps">--</div></div>
+      </div>
+      <div class="maphead">
+        <span class="lbl">AF MAP</span>
+        <span class="lbl" id="mapCount" style="color:var(--accent2)">0 samples</span>
+        <span class="spacer"></span>
+        <button class="btn ghost danger" id="mapClear" type="button">CLEAR</button>
+      </div>
+      <div class="afmap" id="afmap" role="table" aria-label="AFR by rpm and throttle"></div>
+      <p class="hint">แถว = รอบเครื่อง (x1000) · คอลัมน์ = คันเร่ง % · แต่ละช่องเฉลี่ยค่า AFR ขณะขับ เหมือนหน้า AF MAP บนเกจ</p>
+    </section>
+
+    <!-- DATA -->
+    <section class="view" id="v-data" aria-label="Data and settings">
+      <div class="sect">
+        <h2 class="lbl">SPEED SOURCE</h2>
+        <div class="seg" id="segSpeed">
+          <button class="btn ghost" type="button" data-v="auto">AUTO</button>
+          <button class="btn ghost" type="button" data-v="gps">GPS</button>
+          <button class="btn ghost" type="button" data-v="ecu">ECU</button>
+          <button class="btn" type="button" id="gpsBtn">START GPS</button>
+        </div>
+        <dl class="kv" style="margin-top:10px">
+          <dt>GPS</dt><dd id="gpsInfo">off</dd>
+        </dl>
+        <p class="hint">AUTO ใช้ GPS ของมือถือเมื่อมีสัญญาณ ถ้าไม่มีจะใช้ความเร็วจาก ECU</p>
+      </div>
+      <div class="sect">
+        <h2 class="lbl">DISPLAY</h2>
+        <div class="seg" id="segAccent">
+          <button class="btn ghost" type="button" data-v="gauge">AS GAUGE</button>
+          <button class="btn ghost" type="button" data-v="ice">ICE</button>
+          <button class="btn ghost" type="button" data-v="lime">LIME</button>
+          <button class="btn ghost" type="button" data-v="amber">AMBER</button>
+        </div>
+        <div class="seg" id="segUnits" style="margin-top:8px">
+          <button class="btn ghost" type="button" data-v="gauge">UNITS AS GAUGE</button>
+          <button class="btn ghost" type="button" data-v="0">KM/H</button>
+          <button class="btn ghost" type="button" data-v="1">MPH</button>
+        </div>
+        <div class="seg" style="margin-top:8px">
+          <button class="btn ghost" type="button" id="wakeBtn" aria-pressed="false">KEEP SCREEN ON</button>
+          <button class="btn ghost" type="button" id="demoBtn" aria-pressed="false">DEMO</button>
+        </div>
+      </div>
+      <div class="sect">
+        <h2 class="lbl">LIVE VALUES</h2>
+        <div class="rows" id="rows"></div>
+      </div>
+      <div class="sect">
+        <h2 class="lbl">GAUGE</h2>
+        <dl class="kv">
+          <dt>source</dt><dd id="i-src">--</dd>
+          <dt>link</dt><dd id="i-link">--</dd>
+          <dt>shift</dt><dd id="i-shift">--</dd>
+          <dt>packets</dt><dd id="i-pk">0</dd>
+        </dl>
+        <div class="log" id="log" style="margin-top:10px">waiting for data…</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<nav aria-label="Views"><div role="tablist">
+  <button class="tab" role="tab" type="button" data-view="gauge" aria-selected="true">GAUGE</button>
+  <button class="tab" role="tab" type="button" data-view="af" aria-selected="false">AF</button>
+  <button class="tab" role="tab" type="button" data-view="data" aria-selected="false">DATA</button>
+</div></nav>
+
+<script>
+(function () {
+  "use strict";
+  // ---- Nordic UART service: the gauge notifies on TX (see src/net/ble_link.cpp) ----
+  var NUS = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+  var NUS_RX = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+  var NUS_TX = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+  var STALE = 2500;                       // ms: a value not refreshed for this long shows "--"
+  var LINKS = ["IDLE", "CONNECTING", "LIVE", "SIMULATED", "ERROR"];
+  var THEMES = ["ice", "lime", "amber"];
+
+  var $ = function (id) { return document.getElementById(id); };
+  var S = {
+    v: {}, t: {}, seen: {},
+    cfg: { shift: 7000, rmax: 12000, units: 0, theme: 0, oil: 0, rich: 13.8, lean: 15.2, src: "", link: -1 },
+    packets: 0, lastLine: "", lastAt: 0,
+    mode: "off",                          // off | demo | live
+    gps: { on: false, kmh: null, acc: null, at: 0, err: "" }
+  };
+  var prefs = { accent: "gauge", speed: "auto", units: "gauge", wake: false };
+  try { var p = JSON.parse(localStorage.getItem("rl.prefs") || "null"); if (p) for (var k in p) prefs[k] = p[k]; } catch (e) {}
+  function savePrefs() { try { localStorage.setItem("rl.prefs", JSON.stringify(prefs)); } catch (e) {} }
+
+  // ---- AF map: same table and averaging as afmap_model.cpp on the gauge ----
+  var COLS = 11, ROWS = 19, TPS_STEP = 7.5, RPM_MIN = 1000, RPM_STEP = 500;
+  function newMap() { return { afr: new Array(ROWS * COLS).fill(0), n: new Array(ROWS * COLS).fill(0), samples: 0, lastAt: -1, row: -1, col: -1, live: null, dirty: false }; }
+  var maps = { real: newMap(), demo: newMap() };
+  try {
+    var saved = JSON.parse(localStorage.getItem("rl.afmap") || "null");
+    if (saved && saved.afr && saved.afr.length === ROWS * COLS) { maps.real.afr = saved.afr; maps.real.n = saved.n; maps.real.samples = saved.samples || 0; }
+  } catch (e) {}
+  function curMap() { return S.mode === "demo" ? maps.demo : maps.real; }
+  function binOf(rpm, tps) {
+    if (tps < 0) tps = 0;
+    var c = Math.round(tps / TPS_STEP), r = Math.round((rpm - RPM_MIN) / RPM_STEP);
+    return (c < 0 || c >= COLS || r < 0 || r >= ROWS) ? null : [r, c];
+  }
+  function feedMap(m, now, hasNewAfr, at) {
+    var rpm = val("rpm", now), tps = val("tps", now), afr = val("afr", now);
+    var b = (rpm != null && tps != null) ? binOf(rpm, tps) : null;
+    m.row = b ? b[0] : -1; m.col = b ? b[1] : -1;
+    m.live = afr;
+    if (afr == null || !hasNewAfr || !b || at === m.lastAt) return;
+    m.lastAt = at;
+    var i = b[0] * COLS + b[1];
+    if (m.n[i] === 0) m.afr[i] = afr;
+    else { var a = Math.max(1 / (m.n[i] + 1), 0.15); m.afr[i] += (afr - m.afr[i]) * a; }
+    if (m.n[i] < 65535) m.n[i]++;
+    m.samples++; m.dirty = true;
+  }
+
+  // ---- parsing: one line = space separated key=value ----
+  function val(k, now) { var t = S.t[k]; return (t != null && now - t < STALE) ? S.v[k] : null; }
+  var DEMO_SHIFT = 9000;
+  var CFG_KEYS = { shift: 1, rmax: 1, units: 1, theme: 1, oil: 1, rich: 1, lean: 1 };
+  function handleLine(line) {
+    line = line.trim(); if (!line) return;
+    var now = performance.now(), hasAfr = false, at = null;
+    var parts = line.split(/\s+/);
+    for (var i = 0; i < parts.length; i++) {
+      var eq = parts[i].indexOf("="); if (eq < 1) continue;
+      var k = parts[i].slice(0, eq), raw = parts[i].slice(eq + 1);
+      if (k === "src") { S.cfg.src = raw.replace(/_/g, " "); continue; }
+      var n = parseFloat(raw); if (!isFinite(n)) continue;
+      if (k === "link") { S.cfg.link = n; continue; }
+      if (CFG_KEYS[k]) { S.cfg[k] = n; continue; }
+      if (k === "at") { at = n; continue; }
+      if (k === "afr") hasAfr = true;
+      S.v[k] = n; S.t[k] = now; S.seen[k] = true;
+    }
+    S.packets++; S.lastLine = line; S.lastAt = now;
+    feedMap(curMap(), now, hasAfr, at);
+  }
+  var buf = "", dec = new TextDecoder();
+  function handleChunk(bytes) {          // BLE notifications arrive in pieces; lines end at "\n"
+    buf += (typeof bytes === "string") ? bytes : dec.decode(bytes);
+    var i;
+    while ((i = buf.indexOf("\n")) >= 0) { handleLine(buf.slice(0, i)); buf = buf.slice(i + 1); }
+    if (buf.length > 2048) buf = "";
+  }
+
+  // ---- Bluetooth ----
+  var dev = null, rxChar = null, retry = 0, wantConn = false;
+  function say(msg, kind) { var n = $("notice"); n.hidden = !msg; n.textContent = msg || ""; n.style.borderLeftColor = kind === "err" ? "var(--crit)" : "var(--warn)"; }
+  async function openLink() {
+    var server = await dev.gatt.connect();
+    var svc = await server.getPrimaryService(NUS);
+    var tx = await svc.getCharacteristic(NUS_TX);
+    try { rxChar = await svc.getCharacteristic(NUS_RX); } catch (e) { rxChar = null; }
+    tx.addEventListener("characteristicvaluechanged", function (e) { handleChunk(e.target.value); });
+    retry = 0; buf = "";
+    if (S.mode !== "live") { stopDemo(); S.mode = "live"; S.v = {}; S.t = {}; S.seen = {}; }
+    await tx.startNotifications();
+    say("");
+    wake();
+  }
+  async function connect() {
+    if (!navigator.bluetooth) {
+      say("เบราว์เซอร์นี้ไม่รองรับ Web Bluetooth ใช้ Chrome บน Android หรือแอป Bluefy บน iPhone และเปิดหน้านี้ผ่าน https", "err");
+      return;
+    }
+    try {
+      dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [NUS] }, { namePrefix: "REDLINE" }], optionalServices: [NUS] });
+      wantConn = true;
+      dev.addEventListener("gattserverdisconnected", onDrop);
+      $("connectBtn").textContent = "CONNECTING…";
+      await openLink();
+    } catch (e) {
+      wantConn = false;
+      $("connectBtn").textContent = "CONNECT";
+      if (e && e.name === "NotFoundError") return;           // the picker was closed
+      say("เชื่อมต่อไม่สำเร็จ: " + (e && e.message ? e.message : e) + " · ตรวจว่าเกจเปิดอยู่ และไม่ได้ใช้แหล่งข้อมูล OBD BT", "err");
+    }
+  }
+  function onDrop() {
+    if (!wantConn) return;
+    if (retry >= 6) { wantConn = false; S.mode = "off"; say("หลุดจากเกจ กด CONNECT เพื่อต่อใหม่", "err"); return; }
+    var wait = Math.min(500 * Math.pow(2, retry++), 5000);
+    say("หลุดจากเกจ กำลังต่อใหม่…");
+    setTimeout(function () { if (wantConn) openLink().catch(onDrop); }, wait);
+  }
+  function disconnect() { wantConn = false; if (dev && dev.gatt.connected) dev.gatt.disconnect(); S.mode = "off"; }
+  $("connectBtn").addEventListener("click", function () {
+    if (S.mode === "live") { disconnect(); return; }
+    connect();
+  });
+
+  // ---- demo: a made-up ride that goes through the same parser as real data ----
+  var demoTimer = null, demoT = 0, demoAt = 0;
+  var GEARS = [0, 11.5, 7.0, 5.1, 4.0, 3.2];     // km/h per 1000 rpm in each gear (110cc style box)
+  function demoLine() {
+    demoT += 0.125;
+    var cyc = demoT % 40, tps, gear, rpm, spd;
+    var ph = cyc < 26 ? "acc" : cyc < 32 ? "cruise" : "dec";
+    var speedNow = ph === "acc" ? 6 + cyc * 3.2 : ph === "cruise" ? 88 + Math.sin(demoT) * 2 : Math.max(0, 88 - (cyc - 32) * 9);
+    gear = speedNow < 18 ? 1 : speedNow < 34 ? 2 : speedNow < 52 ? 3 : speedNow < 72 ? 4 : 5;
+    rpm = Math.round(Math.min(11000, Math.max(1400, speedNow / GEARS[gear] * 1000 + (ph === "acc" ? 700 : 0))));
+    tps = ph === "acc" ? 55 + 20 * Math.sin(demoT * .8) : ph === "cruise" ? 12 + 3 * Math.sin(demoT * 1.3) : 0;
+    spd = Math.round(speedNow);
+    var afr = ph === "acc" ? 12.9 + Math.sin(demoT * 2) * .3 : ph === "cruise" ? 14.6 + Math.sin(demoT * 3) * .5 : 15.9 + Math.sin(demoT) * .3;
+    if (Math.round(demoT * 8) % 2 === 0) demoAt = (demoAt + 1) & 0xffff;
+    var l = "rpm=" + rpm + " spd=" + spd + " clt=" + Math.round(78 + Math.min(14, demoT / 6)) + " volt=" + (13.8 + Math.sin(demoT * .4) * .2).toFixed(1) +
+      " iat=" + Math.round(34 + Math.sin(demoT * .1) * 2) + " gear=" + gear + " tps=" + tps.toFixed(1) + " afr=" + afr.toFixed(2) + " at=" + demoAt +
+      " stft=" + (Math.sin(demoT * .7) * 3).toFixed(1) + " ltft=" + (-1.5).toFixed(1) + " map=" + Math.round(35 + tps * .9) + " ign=" + (12 + tps * .2).toFixed(1) +
+      " o2=" + Math.round(afr < 14.7 ? 700 : 150) + " link=3";
+    if (Math.round(demoT * 8) % 16 === 0) l += " shift=" + DEMO_SHIFT + " rmax=12000 units=0 oil=0 rich=13.8 lean=15.2 src=DEMO";
+    return l + "\n";
+  }
+  function startDemo() {
+    if (S.mode === "live") return;
+    S.mode = "demo"; S.v = {}; S.t = {}; S.seen = {};
+    if (!demoTimer) { for (var i = 0; i < 700; i++) handleChunk(demoLine()); demoTimer = setInterval(function () { handleChunk(demoLine()); }, 125); }
+    $("demoBtn").setAttribute("aria-pressed", "true");
+    $("connectBtn").textContent = "CONNECT";
+  }
+  function stopDemo() { if (demoTimer) { clearInterval(demoTimer); demoTimer = null; } $("demoBtn").setAttribute("aria-pressed", "false"); }
+  $("demoBtn").addEventListener("click", function () {
+    if (S.mode === "demo") { stopDemo(); S.mode = "off"; S.v = {}; S.t = {}; S.seen = {}; }
+    else if (S.mode === "live") { say("ตัดการเชื่อมต่อจากเกจก่อน จึงจะเปิดโหมดเดโมได้"); }
+    else startDemo();
+  });
+
+  // ---- phone GPS ----
+  var watchId = null;
+  function startGps() {
+    if (!navigator.geolocation) { S.gps.err = "not supported"; return; }
+    S.gps.on = true; S.gps.err = "waiting for a fix…";
+    try {
+      watchId = navigator.geolocation.watchPosition(function (p) {
+        S.gps.err = ""; S.gps.acc = p.coords.accuracy;
+        S.gps.kmh = (p.coords.speed != null && isFinite(p.coords.speed)) ? Math.max(0, p.coords.speed * 3.6) : null;
+        S.gps.at = performance.now();
+      }, function (e) { S.gps.err = e.code === 1 ? "permission denied" : "no fix"; S.gps.kmh = null; },
+      { enableHighAccuracy: true, maximumAge: 500, timeout: 10000 });
+    } catch (e) { S.gps.err = "blocked here"; S.gps.on = false; }
+  }
+  function ensureGps() { if (!S.gps.on && prefs.speed !== "ecu") startGps(); }
+
+  // ---- wake lock ----
+  var lock = null;
+  async function wake() {
+    if (!prefs.wake || !navigator.wakeLock) return;
+    try { lock = await navigator.wakeLock.request("screen"); lock.addEventListener("release", function () { lock = null; }); } catch (e) {}
+  }
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible" && prefs.wake && !lock) wake(); });
+
+  // ---- build the static parts ----
+  var shiftEl = $("shift"), segs = [];
+  for (var i = 0; i < 13; i++) { var b = document.createElement("b"); shiftEl.appendChild(b); segs.push(b); }
+
+  var TILES = [
+    { k: "clt", l: function () { return S.cfg.oil ? "OIL TEMP" : "ENGINE TEMP"; }, f: 0, u: "°C", cls: function (v) { return v >= 105 ? "hot" : ""; } },
+    { k: "volt", l: function () { return "BATTERY"; }, f: 1, u: "V", cls: function (v) { return v < 11.8 ? "hot" : ""; } },
+    { k: "afr", l: function () { return "AFR"; }, f: 1, u: "", cls: function (v) { return afrClass(v); } },
+    { k: "tps", l: function () { return "THROTTLE"; }, f: 0, u: "%" },
+    { k: "iat", l: function () { return "INTAKE AIR"; }, f: 0, u: "°C" },
+    { k: "map", l: function () { return "MAP"; }, f: 0, u: "kPa" },
+    { k: "ign", l: function () { return "SPARK"; }, f: 1, u: "°" },
+    { k: "load", l: function () { return "LOAD"; }, f: 0, u: "%" },
+    { k: "fuel", l: function () { return "FUEL"; }, f: 0, u: "%" },
+    { k: "soc", l: function () { return "HV BATTERY"; }, f: 0, u: "%" }
+  ];
+  var tilesEl = $("tiles");
+  TILES.forEach(function (t) {
+    var d = document.createElement("div"); d.className = "tile"; d.hidden = true;
+    d.innerHTML = '<div class="lbl"></div><div class="num v">--</div>';
+    tilesEl.appendChild(d); t.el = d; t.lb = d.firstChild; t.vv = d.lastChild;
+  });
+
+  var ROWS_DEF = [["rpm", "RPM", 0, ""], ["spd", "SPEED (ECU)", 0, "km/h"], ["gear", "GEAR", 0, ""], ["clt", "TEMP", 0, "°C"], ["volt", "BATTERY", 1, "V"], ["iat", "INTAKE AIR", 0, "°C"],
+    ["tps", "THROTTLE", 1, "%"], ["afr", "AFR", 2, ""], ["stft", "STFT", 1, "%"], ["ltft", "LTFT", 1, "%"], ["map", "MAP", 0, "kPa"], ["ign", "SPARK", 1, "°"],
+    ["o2", "O2", 0, "mV"], ["load", "LOAD", 0, "%"], ["fuel", "FUEL LEVEL", 0, "%"], ["fuelrate", "FUEL RATE", 1, "L/h"], ["soc", "HV SOC", 0, "%"], ["hvkw", "HV POWER", 1, "kW"]];
+  var rowsEl = $("rows");
+  ROWS_DEF.forEach(function (r) {
+    var d = document.createElement("div"); d.hidden = true;
+    d.innerHTML = '<span class="lbl">' + r[1] + '</span><span>--</span><span></span>';
+    rowsEl.appendChild(d); r.el = d; r.vv = d.children[1]; r.age = d.children[2];
+  });
+
+  var mapEl = $("afmap"), cells = [], heads = [], rowHeads = [];
+  (function () {
+    var corner = document.createElement("div"); corner.className = "h"; corner.textContent = "AF"; mapEl.appendChild(corner);
+    for (var c = 0; c < COLS; c++) { var h = document.createElement("div"); h.className = "h"; h.textContent = (c * TPS_STEP).toFixed(c % 2 ? 1 : 0).replace(/\.0$/, ""); mapEl.appendChild(h); heads.push(h); }
+    for (var r = 0; r < ROWS; r++) {
+      var rh = document.createElement("div"); rh.className = "h"; rh.textContent = ((RPM_MIN + r * RPM_STEP) / 1000).toFixed(1); mapEl.appendChild(rh); rowHeads.push(rh);
+      for (var c2 = 0; c2 < COLS; c2++) { var d = document.createElement("div"); d.className = "c"; d.textContent = "·"; mapEl.appendChild(d); cells.push(d); }
+    }
+  })();
+  var cellState = new Array(ROWS * COLS).fill("");
+  var lastCur = -1, lastRowH = -1, lastColH = -1;
+
+  // ---- helpers ----
+  function afrClass(a) { if (a == null) return ""; return a < S.cfg.rich ? "rich" : a > S.cfg.lean ? "lean" : "ok"; }
+  function fmt(v, f) { return v == null ? "--" : v.toFixed(f); }
+  function unitsMph() { return prefs.units === "gauge" ? S.cfg.units === 1 : prefs.units === "1"; }
+  function speedNow(now) {
+    var gpsOk = S.gps.kmh != null && now - S.gps.at < 3000;
+    var ecu = val("spd", now);
+    if (prefs.speed === "gps") return { v: gpsOk ? S.gps.kmh : null, src: "GPS" };
+    if (prefs.speed === "ecu") return { v: ecu, src: "ECU" };
+    return gpsOk ? { v: S.gps.kmh, src: "GPS" } : { v: ecu, src: "ECU" };
+  }
+
+  // ---- render ----
+  var wasFlash = false, lastCount = -1;
+  function render() {
+    var now = performance.now();
+    // status pill + button
+    var pill = $("pill"), pt = $("pillText");
+    var fresh = S.lastAt && now - S.lastAt < 2500;
+    pill.className = "pill" + (S.mode === "demo" ? " demo" : S.mode === "live" ? (fresh ? " live" : " err") : "");
+    pt.textContent = S.mode === "demo" ? "DEMO" : S.mode === "live" ? (fresh ? (S.cfg.src ? S.cfg.src : "LIVE") : "NO DATA") : "OFFLINE";
+    $("connectBtn").textContent = S.mode === "live" ? "DISCONNECT" : "CONNECT";
+
+    // theme
+    var acc = prefs.accent === "gauge" ? (THEMES[S.cfg.theme] || "ice") : prefs.accent;
+    if (document.documentElement.getAttribute("data-accent") !== acc) document.documentElement.setAttribute("data-accent", acc);
+
+    // gauge
+    var rpm = val("rpm", now), rmax = S.cfg.rmax || 12000, sh = S.cfg.shift || 7000;
+    for (var i = 0; i < 13; i++) {
+      var th = (i + 1) / 13 * rmax, lit = rpm != null && rpm >= th - rmax / 26;
+      segs[i].className = (lit ? "on " : "") + (th >= sh ? "red" : th >= sh * .8 ? "hi" : "");
+    }
+    var flash = rpm != null && rpm >= sh;
+    if (flash !== wasFlash) { shiftEl.classList.toggle("flash", flash); wasFlash = flash; }
+    $("rpm").textContent = rpm == null ? "--" : Math.round(rpm);
+    var sp = speedNow(now), mph = unitsMph();
+    $("speed").textContent = sp.v == null ? "--" : Math.round(mph ? sp.v * 0.621371 : sp.v);
+    $("speedUnit").textContent = mph ? "MPH" : "KM/H";
+    var tag = $("speedTag"); tag.textContent = sp.src; tag.className = "tag" + (sp.src === "GPS" ? " gps" : "");
+    var g = val("gear", now); $("gear").textContent = g == null ? "-" : (g === 0 ? "N" : Math.round(g));
+    TILES.forEach(function (t) {
+      var v = val(t.k, now);
+      if (S.seen[t.k]) t.el.hidden = false; else t.el.hidden = true;
+      t.lb.textContent = t.l();
+      var cls = v != null && t.cls ? t.cls(v) : "";
+      t.vv.className = "num v" + (cls ? " " + cls : "");
+      t.vv.innerHTML = v == null ? "--" : v.toFixed(t.f) + (t.u ? "<small>" + t.u + "</small>" : "");
+    });
+
+    // AF
+    var m = curMap(), afr = val("afr", now);
+    var cl = afrClass(afr);
+    $("afNum").textContent = fmt(afr, 1);
+    $("afNum").style.color = cl === "rich" ? "var(--warn)" : cl === "lean" ? "var(--lean)" : cl === "ok" ? "var(--good)" : "var(--muted)";
+    $("afState").textContent = afr == null ? "NO SIGNAL" : cl === "rich" ? "RICH" : cl === "lean" ? "LEAN" : "OK";
+    $("afState").style.color = $("afNum").style.color;
+    var sc = $("afScale");
+    sc.style.setProperty("--zr", ((S.cfg.rich - 10) / 8 * 100).toFixed(1) + "%");
+    sc.style.setProperty("--zl", ((S.cfg.lean - 10) / 8 * 100).toFixed(1) + "%");
+    $("afMark").style.left = afr == null ? "0%" : "calc(" + (Math.min(18, Math.max(10, afr)) - 10) / 8 * 100 + "% - 1.5px)";
+    $("afMark").style.opacity = afr == null ? 0 : 1;
+    function mini(id, k, f) { $(id).textContent = fmt(val(k, now), f); }
+    mini("m-stft", "stft", 1); mini("m-ltft", "ltft", 1); mini("m-o2", "o2", 0); mini("m-tps", "tps", 1);
+
+    // AF map (only touch cells whose look changed)
+    for (var j = 0; j < ROWS * COLS; j++) {
+      var st = m.n[j] ? (m.afr[j] < S.cfg.rich ? "r" : m.afr[j] > S.cfg.lean ? "l" : "g") + m.afr[j].toFixed(1) : "";
+      if (st !== cellState[j]) {
+        cellState[j] = st;
+        cells[j].className = "c" + (st ? " " + st[0] : "");
+        cells[j].textContent = st ? st.slice(1) : "·";
+      }
+    }
+    var cur = m.row >= 0 ? m.row * COLS + m.col : -1;
+    if (cur !== lastCur) {
+      if (lastCur >= 0) cells[lastCur].classList.remove("cur");
+      if (cur >= 0) cells[cur].classList.add("cur");
+      lastCur = cur;
+    }
+    if (m.row !== lastRowH || m.col !== lastColH) {
+      if (lastRowH >= 0) rowHeads[lastRowH].classList.remove("cur");
+      if (lastColH >= 0) heads[lastColH].classList.remove("cur");
+      if (m.row >= 0) rowHeads[m.row].classList.add("cur");
+      if (m.col >= 0) heads[m.col].classList.add("cur");
+      lastRowH = m.row; lastColH = m.col;
+    }
+    if (m.samples !== lastCount) { $("mapCount").textContent = m.samples + " samples"; lastCount = m.samples; }
+
+    // DATA
+    ROWS_DEF.forEach(function (r) {
+      var v = val(r[0], now);
+      r.el.hidden = !S.seen[r[0]];
+      r.vv.textContent = v == null ? "--" : v.toFixed(r[2]) + (r[3] ? " " + r[3] : "");
+      r.age.textContent = S.t[r[0]] != null ? ((now - S.t[r[0]]) / 1000).toFixed(1) + " s" : "";
+    });
+    $("i-src").textContent = S.cfg.src || "--";
+    $("i-link").textContent = LINKS[S.cfg.link] || "--";
+    $("i-shift").textContent = S.cfg.shift + " rpm";
+    $("i-pk").textContent = String(S.packets);
+    if (S.lastLine && $("v-data").classList.contains("on")) $("log").textContent = S.lastLine;
+    var gi = S.gps.on ? (S.gps.err ? S.gps.err : (S.gps.kmh != null ? S.gps.kmh.toFixed(1) + " km/h · ±" + Math.round(S.gps.acc || 0) + " m" : "fix, no speed yet")) : "off";
+    $("gpsInfo").textContent = gi;
+  }
+  setInterval(render, 100);
+
+  // ---- UI wiring ----
+  var tabs = document.querySelectorAll(".tab");
+  function show(name) {
+    tabs.forEach(function (t) { t.setAttribute("aria-selected", t.dataset.view === name ? "true" : "false"); });
+    ["gauge", "af", "data"].forEach(function (n) { $("v-" + n).classList.toggle("on", n === name); });
+    try { sessionStorage.setItem("rl.view", name); } catch (e) {}
+  }
+  tabs.forEach(function (t) { t.addEventListener("click", function () { show(t.dataset.view); }); });
+  try { var sv = sessionStorage.getItem("rl.view"); if (sv) show(sv); } catch (e) {}
+
+  function bindSeg(id, key, after) {
+    var box = $(id);
+    function paint() { box.querySelectorAll("button").forEach(function (b) { b.classList.toggle("on", String(prefs[key]) === b.dataset.v); }); }
+    box.addEventListener("click", function (e) {
+      var b = e.target.closest("button"); if (!b) return;
+      prefs[key] = b.dataset.v; savePrefs(); paint(); if (after) after();
+    });
+    paint();
+  }
+  bindSeg("segSpeed", "speed", ensureGps);
+  bindSeg("segAccent", "accent");
+  bindSeg("segUnits", "units");
+  $("gpsBtn").addEventListener("click", function () { if (!S.gps.on) startGps(); });
+  $("wakeBtn").setAttribute("aria-pressed", prefs.wake ? "true" : "false");
+  $("wakeBtn").addEventListener("click", function () {
+    prefs.wake = !prefs.wake; savePrefs(); $("wakeBtn").setAttribute("aria-pressed", prefs.wake ? "true" : "false");
+    if (prefs.wake) wake(); else if (lock) { lock.release(); lock = null; }
+  });
+
+  var clearArmed = 0;
+  $("mapClear").addEventListener("click", function () {                 // two taps: the first one arms it
+    var b = $("mapClear"), now = Date.now();
+    if (now - clearArmed > 3000) { clearArmed = now; b.textContent = "TAP AGAIN"; setTimeout(function () { b.textContent = "CLEAR"; }, 3000); return; }
+    clearArmed = 0; b.textContent = "CLEAR";
+    var m = curMap(), fresh = newMap(); fresh.dirty = true;
+    if (S.mode === "demo") maps.demo = fresh; else maps.real = fresh;
+    lastCount = -1;
+    if (S.mode === "live" && rxChar) { try { rxChar.writeValue(new TextEncoder().encode("afclear\n")); } catch (e) {} }
+  });
+  setInterval(function () {                                              // the real map survives a reload
+    var m = maps.real; if (!m.dirty) return; m.dirty = false;
+    try { localStorage.setItem("rl.afmap", JSON.stringify({ afr: m.afr.map(function (x) { return +x.toFixed(3); }), n: m.n, samples: m.samples })); } catch (e) {}
+  }, 5000);
+
+  if (!navigator.bluetooth) say("เบราว์เซอร์นี้ยังเชื่อมบลูทูธกับเกจไม่ได้ (ใช้ Chrome บน Android หรือ Bluefy บน iPhone ผ่าน https) ตอนนี้แสดงโหมดเดโม");
+  if (prefs.speed !== "ecu" && navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({ name: "geolocation" }).then(function (r) { if (r.state === "granted") startGps(); }).catch(function () {});
+  }
+  startDemo();
+  render();
+  window.redline = { handleChunk: handleChunk, state: S };              // handy in the browser console
+})();
+</script>
+</body>
+</html>
